@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEO-VERIDIA 2099 // Infinite Procedural Cyberpunk Megastructure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <!-- Three.js & Post-Processing Dependencies (r128) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+    <style>
+        :root {
+            --neon-cyan: #00f3ff;
+            --neon-magenta: #ff007f;
+            --neon-yellow: #fcee09;
+            --bg-dark: rgba(6, 8, 18, 0.78);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #020208;
+            font-family: 'Share Tech Mono', monospace;
+            color: #e2f1ff;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* CRT Scanline & Vignette Overlay */
+        .crt-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
+            background: 
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                radial-gradient(circle at center, transparent 55%, rgba(0, 0, 0, 0.75) 100%);
+            background-size: 100% 4px, 100% 100%;
+        }
+
+        /* Cyberpunk Panel Styling */
+        .cyber-panel {
+            background: var(--bg-dark);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 243, 255, 0.35);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.12), inset 0 0 15px rgba(0, 243, 255, 0.05);
+            clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+        }
+
+        .cyber-panel-magenta {
+            border-color: rgba(255, 0, 127, 0.45);
+            box-shadow: 0 0 20px rgba(255, 0, 127, 0.15), inset 0 0 15px rgba(255, 0, 127, 0.06);
+        }
+
+        .cyber-button {
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid rgba(0, 243, 255, 0.5);
+            color: var(--neon-cyan);
+            transition: all 0.18s ease;
+            clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+            cursor: pointer;
+        }
+
+        .cyber-button:hover {
+            background: rgba(0, 243, 255, 0.28);
+            box-shadow: 0 0 14px rgba(0, 243, 255, 0.6);
+            transform: translateY(-1px);
+        }
+
+        .cyber-button.active {
+            background: rgba(255, 0, 127, 0.28);
+            border-color: var(--neon-magenta);
+            color: #fff;
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.65);
+        }
+
+        /* Custom Range Sliders */
+        input[type=range].cyber-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 5px;
+            background: rgba(0, 243, 255, 0.2);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type=range].cyber-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--neon-cyan);
+            box-shadow: 0 0 8px var(--neon-cyan);
+            cursor: pointer;
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+        }
+
+        /* Crosshair Animations */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.7; }
+            50% { transform: scale(1.06); opacity: 0.35; }
+            100% { transform: scale(0.95); opacity: 0.7; }
+        }
+
+        .reticle-ring {
+            animation: pulse-ring 3s infinite ease-in-out;
+        }
+
+        /* Custom Scrollbar for HUD Panel */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--neon-cyan);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- WebGL Viewport Container -->
+    <div id="canvas-container" class="fixed inset-0 z-0"></div>
+
+    <!-- CRT Scanline & Atmospheric Vignette -->
+    <div class="crt-overlay"></div>
+
+    <!-- Center Flight Reticle & Artificial Horizon HUD -->
+    <div id="flight-reticle" class="fixed inset-0 pointer-events-none z-20 flex items-center justify-center">
+        <svg width="240" height="240" viewBox="0 0 240 240" class="opacity-65">
+            <!-- Outer Compass Ring -->
+            <circle cx="120" cy="120" r="90" fill="none" stroke="#00f3ff" stroke-width="0.75" stroke-dasharray="6 12" class="reticle-ring" />
+            <!-- Inner Target Brackets -->
+            <path d="M 85 95 L 75 95 L 75 145 L 85 145" fill="none" stroke="#00f3ff" stroke-width="1.5" />
+            <path d="M 155 95 L 165 95 L 165 145 L 155 145" fill="none" stroke="#00f3ff" stroke-width="1.5" />
+            <!-- Center Pip -->
+            <circle cx="120" cy="120" r="2.5" fill="#ff007f" />
+            <line x1="106" y1="120" x2="114" y2="120" stroke="#00f3ff" stroke-width="1.2" />
+            <line x1="126" y1="120" x2="134" y2="120" stroke="#00f3ff" stroke-width="1.2" />
+            <line x1="120" y1="106" x2="120" y2="114" stroke="#00f3ff" stroke-width="1.2" />
+            <!-- Pitch Ladder Dynamic Group -->
+            <g id="hud-pitch-ladder" transform="translate(0, 0) rotate(0, 120, 120)">
+                <line x1="95" y1="105" x2="108" y2="105" stroke="#ff007f" stroke-width="1" opacity="0.7" />
+                <line x1="132" y1="105" x2="145" y2="105" stroke="#ff007f" stroke-width="1" opacity="0.7" />
+                <line x1="95" y1="135" x2="108" y2="135" stroke="#ff007f" stroke-width="1" opacity="0.7" />
+                <line x1="132" y1="135" x2="145" y2="135" stroke="#ff007f" stroke-width="1" opacity="0.7" />
+            </g>
+        </svg>
+    </div>
+
+    <!-- Top Left: Telemetry & Sector Status -->
+    <div class="fixed top-4 left-4 z-30 flex flex-col gap-2 max-w-xs sm:max-w-sm pointer-events-auto">
+        <div class="cyber-panel px-4 py-3">
+            <div class="flex items-center justify-between gap-4 border-b border-cyan-500/30 pb-1.5 mb-2">
+                <div>
+                    <span class="text-[10px] tracking-widest text-pink-500 font-bold block">SYS.GRID // INFINITE STREAM</span>
+                    <h1 class="font-orbitron text-base sm:text-lg font-black tracking-wider text-cyan-300 drop-shadow-[0_0_8px_rgba(0,243,255,0.6)]">
+                        NEO-VERIDIA 2099
+                    </h1>
+                </div>
+                <div class="text-right">
+                    <span id="hud-fps" class="text-xs font-bold text-yellow-300">60 FPS</span>
+                    <span class="text-[10px] block text-cyan-400/70">SHADERS: ACTIVE</span>
+                </div>
+            </div>
+
+            <!-- Live Flight Readouts -->
+            <div class="grid grid-cols-3 gap-2 text-xs">
+                <div class="bg-cyan-950/40 border border-cyan-500/20 p-1.5 rounded">
+                    <span class="text-[10px] text-cyan-400/70 block">AIRSPEED</span>
+                    <span id="hud-speed" class="font-orbitron text-sm font-bold text-white">084</span>
+                    <span class="text-[9px] text-cyan-300">KTS</span>
+                </div>
+                <div class="bg-cyan-950/40 border border-cyan-500/20 p-1.5 rounded">
+                    <span class="text-[10px] text-cyan-400/70 block">ALTITUDE</span>
+                    <span id="hud-alt" class="font-orbitron text-sm font-bold text-white">185</span>
+                    <span class="text-[9px] text-cyan-300">M</span>
+                </div>
+                <div class="bg-cyan-950/40 border border-cyan-500/20 p-1.5 rounded">
+                    <span class="text-[10px] text-cyan-400/70 block">HEADING</span>
+                    <span id="hud-heading" class="font-orbitron text-sm font-bold text-pink-400">360° N</span>
+                </div>
+            </div>
+
+            <div class="mt-2 flex items-center justify-between text-[11px] text-cyan-200/80">
+                <span>SECTOR: <strong id="hud-sector" class="text-yellow-300">[00, 00]</strong></span>
+                <span>ACTIVE TOWERS: <strong id="hud-towers" class="text-cyan-300">576</strong></span>
+            </div>
+        </div>
+
+        <!-- Quick Action Bar -->
+        <div class="flex flex-wrap gap-1.5">
+            <button id="btn-pointerlock" class="cyber-button px-3 py-1.5 text-xs font-bold tracking-wider flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                ENGAGE FREE-FLIGHT (CLICK)
+            </button>
+            <button id="btn-autopilot" class="cyber-button px-3 py-1.5 text-xs font-bold tracking-wider">
+                AUTOPILOT: OFF
+            </button>
+            <button id="btn-audio" class="cyber-button px-3 py-1.5 text-xs font-bold tracking-wider">
+                SYNTH AUDIO: OFF
+            </button>
+            <button id="btn-toggle-ui" class="cyber-button px-2.5 py-1.5 text-xs font-bold" title="Toggle Shader Deck (H)">
+                DECK [H]
+            </button>
+        </div>
+    </div>
+
+    <!-- Top Right: Shader & Environment Matrix Deck -->
+    <div id="shader-deck" class="fixed top-4 right-4 z-30 w-72 sm:w-80 cyber-panel cyber-panel-magenta p-4 transition-all duration-300 max-h-[85vh] overflow-y-auto pointer-events-auto">
+        <div class="flex items-center justify-between border-b border-pink-500/30 pb-2 mb-3">
+            <div>
+                <span class="text-[10px] text-cyan-400 tracking-widest block">GLSL UNIFORM CONTROLLER</span>
+                <h2 class="font-orbitron text-sm font-bold text-pink-400">ATMOSPHERE & SHADER MATRIX</h2>
+            </div>
+            <span class="text-[10px] px-1.5 py-0.5 bg-pink-500/20 border border-pink-500/40 text-pink-300 rounded">LIVE</span>
+        </div>
+
+        <div class="space-y-3 text-xs">
+            <!-- Color Palette Selector -->
+            <div>
+                <label class="text-[10px] text-cyan-300/80 tracking-wider block mb-1">CYBER COLOR MATRIX</label>
+                <div class="grid grid-cols-3 gap-1.5">
+                    <button data-theme="0" class="theme-btn cyber-button active py-1 text-[10px] font-bold">NEON NOIR</button>
+                    <button data-theme="1" class="theme-btn cyber-button py-1 text-[10px] font-bold">GOLD CORP</button>
+                    <button data-theme="2" class="theme-btn cyber-button py-1 text-[10px] font-bold">BIOTECH</button>
+                </div>
+            </div>
+
+            <!-- Sliders -->
+            <div>
+                <div class="flex justify-between mb-1">
+                    <span class="text-cyan-200">UNREAL BLOOM INTENSITY</span>
+                    <span id="val-bloom" class="text-pink-400 font-bold">1.45</span>
+                </div>
+                <input id="slider-bloom" type="range" min="0.2" max="2.8" step="0.05" value="1.45" class="cyber-slider">
+            </div>
+
+            <div>
+                <div class="flex justify-between mb-1">
+                    <span class="text-cyan-200">VOLUMETRIC SMOG DENSITY</span>
+                    <span id="val-smog" class="text-pink-400 font-bold">1.00</span>
+                </div>
+                <input id="slider-smog" type="range" min="0.1" max="2.5" step="0.05" value="1.00" class="cyber-slider">
+            </div>
+
+            <div>
+                <div class="flex justify-between mb-1">
+                    <span class="text-cyan-200">TRAFFIC STREAM VELOCITY</span>
+                    <span id="val-traffic" class="text-pink-400 font-bold">1.20x</span>
+                </div>
+                <input id="slider-traffic" type="range" min="0.1" max="3.5" step="0.1" value="1.2" class="cyber-slider">
+            </div>
+
+            <div>
+                <div class="flex justify-between mb-1">
+                    <span class="text-cyan-200">ACID RAIN PRECIPITATION</span>
+                    <span id="val-rain" class="text-pink-400 font-bold">0.85</span>
+                </div>
+                <input id="slider-rain" type="range" min="0.0" max="2.0" step="0.05" value="0.85" class="cyber-slider">
+            </div>
+
+            <div>
+                <div class="flex justify-between mb-1">
+                    <span class="text-cyan-200">WINDOW NEON OVERDRIVE</span>
+                    <span id="val-neon" class="text-pink-400 font-bold">1.30</span>
+                </div>
+                <input id="slider-neon" type="range" min="0.3" max="2.5" step="0.05" value="1.30" class="cyber-slider">
+            </div>
+
+            <!-- Teleport / Altitude Presets -->
+            <div class="pt-2 border-t border-cyan-500/20">
+                <label class="text-[10px] text-cyan-300/80 tracking-wider block mb-1.5">CAMERA ALTITUDE LAYER</label>
+                <div class="grid grid-cols-3 gap-1.5">
+                    <button id="preset-canyon" class="cyber-button py-1 text-[10px]">STREET CANYON</button>
+                    <button id="preset-mid" class="cyber-button py-1 text-[10px]">SKYBRIDGE</button>
+                    <button id="preset-high" class="cyber-button py-1 text-[10px]">ORBITAL</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Controls & Telemetry Bar -->
+    <div class="fixed bottom-4 left-4 right-4 z-30 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 pointer-events-none">
+        <!-- Keybind Guide -->
+        <div class="cyber-panel px-4 py-2.5 text-[11px] pointer-events-auto">
+            <div class="text-pink-400 font-bold tracking-wider mb-1 flex items-center gap-2">
+                <span>FLIGHT DECK CONTROLS</span>
+                <span id="flight-mode-badge" class="px-1.5 py-0.2 bg-cyan-500/20 border border-cyan-400 text-cyan-300 text-[9px]">MANUAL / DRAG LOOK</span>
+            </div>
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-cyan-100/80">
+                <span><strong class="text-cyan-300">W/A/S/D</strong> THRUST</span>
+                <span><strong class="text-cyan-300">MOUSE</strong> PITCH/YAW</span>
+                <span><strong class="text-pink-400">SHIFT</strong> AFTERBURNER WARP</span>
+                <span><strong class="text-cyan-300">SPACE / C</strong> ALTITUDE</span>
+                <span><strong class="text-cyan-300">Q / E</strong> ROLL</span>
+                <span><strong class="text-yellow-300">P</strong> AUTOPILOT</span>
+            </div>
+        </div>
+
+        <!-- Mobile / Touch Virtual Boost & Altitude Pad -->
+        <div class="flex gap-2 pointer-events-auto sm:hidden">
+            <button id="touch-thrust" class="cyber-button px-4 py-3 text-xs font-bold">THRUST</button>
+            <button id="touch-boost" class="cyber-button active px-4 py-3 text-xs font-bold">BOOST</button>
+        </div>
+
+        <!-- Afterburner Warp Status Gauge -->
+        <div class="cyber-panel px-4 py-2.5 w-full sm:w-64 pointer-events-auto">
+            <div class="flex justify-between text-[10px] mb-1">
+                <span class="text-cyan-300 tracking-wider">PLASMA THRUSTER OUTPUT</span>
+                <span id="hud-thrust-pct" class="text-pink-400 font-bold">35%</span>
+            </div>
+            <div class="w-full h-2 bg-cyan-950 rounded overflow-hidden border border-cyan-500/30">
+                <div id="hud-thrust-bar" class="h-full bg-gradient-to-r from-cyan-400 via-pink-500 to-yellow-300 transition-all duration-75" style="width: 35%"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**************************************************************************
+         * 1. CUSTOM GLSL SHADERS (BUILDINGS, WET STREETS, TRAFFIC, SKY DOME)
+         **************************************************************************/
+
+        // --- A. PROCEDURAL CYBERPUNK SKYSCRAPER FACADE SHADER ---
+        const buildingVertexShader = `
+            attribute float aSeed;
+            attribute float aArchType;
+            attribute vec3 aTowerCenter;
+            attribute vec3 aTowerScale;
+
+            varying vec3 vWorldPos;
+            varying vec3 vNormal;
+            varying vec2 vUv;
+            varying float vSeed;
+            varying float vArchType;
+            varying vec3 vTowerCenter;
+            varying vec3 vTowerScale;
+
+            void main() {
+                vUv = uv;
+                vSeed = aSeed;
+                vArchType = aArchType;
+
+                // Instance matrix support
+                vec4 worldPosition = modelMatrix * instanceMatrix * vec4(position, 1.0);
+                vWorldPos = worldPosition.xyz;
+
+                // Extract tower center & scale in world space
+                vTowerCenter = (modelMatrix * instanceMatrix * vec4(aTowerCenter, 1.0)).xyz;
+                vTowerScale = aTowerScale;
+
+                vNormal = normalize(mat3(modelMatrix * instanceMatrix) * normal);
+                gl_Position = projectionMatrix * viewMatrix * worldPosition;
+            }
+        `;
+
+        const buildingFragmentShader = `
+            uniform float uTime;
+            uniform vec3 uCameraPos;
+            uniform float uSmogDensity;
+            uniform float uNeonOverdrive;
+            uniform float uRainIntensity;
+            uniform int uColorTheme;
+
+            varying vec3 vWorldPos;
+            varying vec3 vNormal;
+            varying vec2 vUv;
+            varying float vSeed;
+            varying float vArchType;
+            varying vec3 vTowerCenter;
+            varying vec3 vTowerScale;
+
+            // Fast pseudo-random hashes
+            float hash11(float p) {
+                p = fract(p * 0.1031);
+                p *= p + 33.33;
+                p *= p + p;
+                return fract(p);
+            }
+
+            float hash21(vec2 p) {
+                vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+                p3 += dot(p3, p3.yzx + 33.33);
+                return fract((p3.x + p3.y) * p3.z);
+            }
+
+            // Palette generator based on active theme
+            vec3 getThemeColor(float selector) {
+                if (uColorTheme == 1) {
+                    // Gold Corp / Syndicate
+                    vec3 c1 = vec3(1.0, 0.78, 0.15);
+                    vec3 c2 = vec3(1.0, 0.22, 0.05);
+                    vec3 c3 = vec3(0.95, 0.95, 1.0);
+                    return selector < 0.45 ? c1 : (selector < 0.8 ? c2 : c3);
+                } else if (uColorTheme == 2) {
+                    // Biotech Emerald / Violet
+                    vec3 c1 = vec3(0.0, 1.0, 0.55);
+                    vec3 c2 = vec3(0.75, 0.1, 1.0);
+                    vec3 c3 = vec3(0.2, 0.9, 1.0);
+                    return selector < 0.45 ? c1 : (selector < 0.8 ? c2 : c3);
+                } else {
+                    // Classic Neon Noir (Cyan / Magenta / Yellow)
+                    vec3 c1 = vec3(0.0, 0.95, 1.0);
+                    vec3 c2 = vec3(1.0, 0.0, 0.55);
+                    vec3 c3 = vec3(1.0, 0.88, 0.1);
+                    return selector < 0.48 ? c1 : (selector < 0.85 ? c2 : c3);
+                }
+            }
+
+            void main() {
+                vec3 norm = normalize(vNormal);
+                bool isRoof = abs(norm.y) > 0.55;
+
+                // Base dark brutalist metamaterial
+                vec3 baseColor = vec3(0.015, 0.02, 0.04);
+                vec3 emissive = vec3(0.0);
+
+                // World-aligned facade coordinates
+                vec2 facadeUV;
+                if (abs(norm.x) > 0.5) {
+                    facadeUV = vWorldPos.zy;
+                } else {
+                    facadeUV = vWorldPos.xy;
+                }
+
+                if (!isRoof) {
+                    // 1. Structural Megastructure Ribbing & Dark Panels
+                    float vRib = smoothstep(0.88, 0.95, abs(sin(facadeUV.x * 0.45 + vSeed * 12.0)));
+                    float hFloorLedge = smoothstep(0.92, 0.98, abs(sin(facadeUV.y * 0.6)));
+                    baseColor *= (1.0 - 0.65 * vRib) * (1.0 - 0.5 * hFloorLedge);
+
+                    // 2. High-Density Procedural Window Matrix
+                    float winScaleX = 0.75 + 0.35 * hash11(vSeed * 17.0);
+                    float winScaleY = 0.55 + 0.25 * hash11(vSeed * 31.0);
+                    vec2 gridUV = facadeUV * vec2(winScaleX, winScaleY);
+                    vec2 cellID = floor(gridUV);
+                    vec2 cellFract = fract(gridUV);
+
+                    // Window frame border mask
+                    float frameX = smoothstep(0.12, 0.18, cellFract.x) * (1.0 - smoothstep(0.82, 0.88, cellFract.x));
+                    float frameY = smoothstep(0.16, 0.22, cellFract.y) * (1.0 - smoothstep(0.78, 0.84, cellFract.y));
+                    float windowMask = frameX * frameY;
+
+                    // Group floors into office/residential bands
+                    float floorBandRand = hash11(cellID.y * 0.37 + floor(vSeed * 100.0));
+                    float cellRand = hash21(cellID + floor(vSeed * 50.0));
+
+                    // Dynamic blinking / data activity in rooms
+                    float timeShift = floor(uTime * (0.4 + cellRand * 1.2) + cellRand * 20.0);
+                    float flicker = step(0.15, hash21(cellID + timeShift * 0.01));
+
+                    float activeProb = smoothstep(0.32, 0.85, floorBandRand) * step(0.42, cellRand);
+                    vec3 winColor = getThemeColor(hash11(vSeed + floor(cellID.y * 0.15)));
+
+                    // Interior vertical gradient inside each window
+                    float interiorGrad = 0.55 + 0.45 * cellFract.y;
+                    emissive += winColor * windowMask * activeProb * flicker * interiorGrad * 1.35;
+
+                    // 3. Animated Holographic Cyber-Billboards on Mega-Towers
+                    float billboardSeed = hash11(vSeed * 93.1);
+                    if (billboardSeed > 0.38 && vWorldPos.y > 35.0 && vWorldPos.y < 320.0) {
+                        float bandY = fract(vWorldPos.y * 0.0085 + vSeed);
+                        float bandX = fract(facadeUV.x * 0.025 + vSeed * 3.0);
+                        if (bandY > 0.35 && bandY < 0.58 && bandX > 0.15 && bandX < 0.85) {
+                            // Animated scanbars & cyber glyphs inside billboard
+                            float scan = 0.6 + 0.4 * sin(vWorldPos.y * 2.5 - uTime * 8.0);
+                            float glyphGrid = step(0.45, hash21(floor(vec2(bandX * 18.0, bandY * 12.0 + floor(uTime * 3.0)))));
+                            vec3 holoCol = getThemeColor(fract(vSeed * 7.3 + 0.35));
+                            emissive = mix(emissive, holoCol * (1.4 + glyphGrid * 1.2) * scan, 0.88);
+                        }
+                    }
+
+                    // 4. Vertical Neon EdgeTrim & Architectural Laser Channels
+                    float edgeDist = abs(fract(facadeUV.x * 0.04 + vSeed) - 0.5);
+                    if (edgeDist < 0.018) {
+                        float pulse = 0.65 + 0.35 * sin(vWorldPos.y * 0.06 - uTime * 5.0 + vSeed * 10.0);
+                        vec3 edgeCol = getThemeColor(fract(vSeed * 3.7));
+                        emissive += edgeCol * pulse * 2.1;
+                    }
+
+                    // 5. Horizontal Mechanical Tech Tiers & Neon Rings
+                    float tierGlow = smoothstep(0.985, 0.998, sin(vWorldPos.y * 0.075 + vSeed * 20.0));
+                    emissive += getThemeColor(fract(vSeed + 0.6)) * tierGlow * 2.4;
+
+                    // 6. Acid Rain Vertical Streaks on Glass Facades
+                    if (uRainIntensity > 0.01) {
+                        float rainColumn = hash11(floor(facadeUV.x * 3.5));
+                        float rainDrop = fract(facadeUV.y * 0.06 + uTime * (1.8 + rainColumn * 1.5) + rainColumn * 10.0);
+                        float dropMask = smoothstep(0.0, 0.12, rainDrop) * (1.0 - smoothstep(0.12, 0.95, rainDrop));
+                        emissive += vec3(0.25, 0.8, 1.0) * dropMask * windowMask * 0.35 * uRainIntensity;
+                    }
+
+                } else {
+                    // ROOFTOP HELIPADS, COOLING VENTS & CIRCUIT MATRIX
+                    vec2 roofUV = vWorldPos.xz * 0.08;
+                    float distFromCenter = length(vWorldPos.xz - vTowerCenter.xz);
+                    float ring = abs(fract(distFromCenter * 0.08 - uTime * 0.4) - 0.5);
+                    float circuit = step(0.92, hash21(floor(roofUV * 4.0)));
+                    vec3 roofCol = getThemeColor(vSeed);
+                    emissive += roofCol * (smoothstep(0.04, 0.0, ring) * 0.8 + circuit * 0.9);
+                }
+
+                // Apply User Neon Overdrive
+                emissive *= uNeonOverdrive;
+
+                // Street-level Upward Neon Spill Bounce
+                float streetBounce = exp(-max(0.0, vWorldPos.y) * 0.022);
+                vec3 bounceColor = mix(vec3(0.0, 0.5, 0.7), vec3(0.7, 0.0, 0.45), sin(vWorldPos.x * 0.01 + vWorldPos.z * 0.01) * 0.5 + 0.5);
+                vec3 litColor = baseColor + emissive + bounceColor * streetBounce * 0.22;
+
+                // Volumetric Cyber-Smog & Height Haze Integration
+                float dist = length(vWorldPos - uCameraPos);
+                float distFog = 1.0 - exp(-dist * 0.00055 * uSmogDensity);
+                float lowAltitudeSmog = exp(-max(0.0, vWorldPos.y) * 0.009) * 0.42 * uSmogDensity;
+                float totalFog = clamp(distFog + lowAltitudeSmog * (dist / 1200.0), 0.0, 0.96);
+
+                // Dynamic directional horizon glow color
+                vec3 viewDir = normalize(vWorldPos - uCameraPos);
+                float horizonMix = smoothstep(-0.3, 0.6, viewDir.x * 0.5 + viewDir.z * 0.5);
+                vec3 fogColor = mix(vec3(0.02, 0.05, 0.14), vec3(0.14, 0.02, 0.12), horizonMix);
+                if (uColorTheme == 1) fogColor = mix(vec3(0.08, 0.05, 0.02), vec3(0.14, 0.04, 0.01), horizonMix);
+                if (uColorTheme == 2) fogColor = mix(vec3(0.01, 0.09, 0.06), vec3(0.06, 0.01, 0.12), horizonMix);
+
+                vec3 finalColor = mix(litColor, fogColor, totalFog);
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `;
+
+        // --- B. DYNAMIC WET PAVEMENT & PULSING ARTERIAL GRID SHADER ---
+        const groundVertexShader = `
+            varying vec3 vWorldPos;
+            void main() {
+                vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                vWorldPos = worldPosition.xyz;
+                gl_Position = projectionMatrix * viewMatrix * worldPosition;
+            }
+        `;
+
+        const groundFragmentShader = `
+            uniform float uTime;
+            uniform vec3 uCameraPos;
+            uniform float uSmogDensity;
+            uniform float uRainIntensity;
+            uniform int uColorTheme;
+
+            varying vec3 vWorldPos;
+
+            float hash21(vec2 p) {
+                vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+                p3 += dot(p3, p3.yzx + 33.33);
+                return fract((p3.x + p3.y) * p3.z);
+            }
+
+            void main() {
+                // Chunk size is 280.0 units with avenues along chunk borders
+                float chunkScale = 280.0;
+                vec2 chunkUV = fract(vWorldPos.xz / chunkScale);
+                vec2 distToAvenue = min(chunkUV, 1.0 - chunkUV) * chunkScale;
+
+                float roadHalfWidth = 24.0;
+                bool isRoadX = distToAvenue.x < roadHalfWidth;
+                bool isRoadZ = distToAvenue.y < roadHalfWidth;
+
+                vec3 asphalt = vec3(0.01, 0.014, 0.025);
+                vec3 glow = vec3(0.0);
+
+                vec3 primaryNeon = uColorTheme == 1 ? vec3(1.0, 0.75, 0.1) : (uColorTheme == 2 ? vec3(0.0, 1.0, 0.55) : vec3(0.0, 0.95, 1.0));
+                vec3 secondaryNeon = uColorTheme == 1 ? vec3(1.0, 0.2, 0.05) : (uColorTheme == 2 ? vec3(0.75, 0.1, 1.0) : vec3(1.0, 0.0, 0.55));
+
+                // Glowing avenue lane markers & energy conduits
+                if (isRoadX || isRoadZ) {
+                    float centerLineX = smoothstep(1.2, 0.0, distToAvenue.x);
+                    float centerLineZ = smoothstep(1.2, 0.0, distToAvenue.y);
+                    float curbLineX = smoothstep(1.5, 0.0, abs(distToAvenue.x - roadHalfWidth));
+                    float curbLineZ = smoothstep(1.5, 0.0, abs(distToAvenue.y - roadHalfWidth));
+
+                    // Moving energy pulse along avenues
+                    float pulseX = 0.5 + 0.5 * sin(vWorldPos.z * 0.04 - uTime * 6.0);
+                    float pulseZ = 0.5 + 0.5 * sin(vWorldPos.x * 0.04 + uTime * 6.0);
+
+                    glow += primaryNeon * (centerLineX * pulseX + centerLineZ * pulseZ) * 1.4;
+                    glow += secondaryNeon * (curbLineX + curbLineZ) * 0.9;
+                }
+
+                // Sub-block cybernetic circuit grid
+                vec2 subGrid = abs(fract(vWorldPos.xz * 0.025) - 0.5);
+                float microLine = smoothstep(0.02, 0.0, min(subGrid.x, subGrid.y));
+                glow += primaryNeon * microLine * 0.18;
+
+                // Wet Asphalt Puddle Specular Shimmer & Acid Rain Ripples
+                vec2 puddleCell = floor(vWorldPos.xz * 0.15);
+                float puddleNoise = hash21(puddleCell);
+                if (uRainIntensity > 0.01) {
+                    vec2 rippleUV = fract(vWorldPos.xz * 0.35) - 0.5;
+                    float ring = abs(length(rippleUV) - fract(uTime * 1.5 + puddleNoise));
+                    float ripple = smoothstep(0.06, 0.0, ring) * uRainIntensity * 0.45;
+                    glow += mix(primaryNeon, secondaryNeon, puddleNoise) * ripple;
+                }
+
+                // Simulated Anisotropic Vertical Neon Reflection Streaks on Wet Ground
+                float streakX = sin(vWorldPos.x * 0.12) * cos(vWorldPos.z * 0.03);
+                float streakZ = cos(vWorldPos.z * 0.12) * sin(vWorldPos.x * 0.03);
+                float wetSheen = smoothstep(0.2, 0.95, abs(streakX + streakZ) * 0.5);
+                vec3 reflectionCol = mix(primaryNeon, secondaryNeon, sin(vWorldPos.x * 0.008) * 0.5 + 0.5);
+                vec3 color = asphalt + glow + reflectionCol * wetSheen * (0.14 + 0.12 * uRainIntensity);
+
+                // Distance Fog
+                float dist = length(vWorldPos - uCameraPos);
+                float fogFactor = clamp(1.0 - exp(-dist * 0.0007 * uSmogDensity), 0.0, 0.98);
+                vec3 fogColor = vec3(0.03, 0.03, 0.09);
+                gl_FragColor = vec4(mix(color, fogColor, fogFactor), 1.0);
+            }
+        `;
+
+        // --- C. MULTI-TIERED AERIAL TRAFFIC STREAM SHADER ---
+        const trafficVertexShader = `
+            attribute vec4 aLaneData; // x: laneAxis (0=X, 1=Z), y: laneCoord, z: altitude, w: speed & dir
+            attribute float aPhase;
+
+            uniform float uTime;
+            uniform vec3 uCameraPos;
+            uniform float uTrafficSpeed;
+
+            varying vec3 vColor;
+            varying float vFogDepth;
+
+            void main() {
+                float axis = aLaneData.x;
+                float laneCoord = aLaneData.y;
+                float altitude = aLaneData.z;
+                float speed = aLaneData.w * uTrafficSpeed;
+
+                float range = 2200.0;
+                float halfRange = range * 0.5;
+
+                // Scale vehicle mesh into a sleek light-streak capsule
+                vec3 scaledPos = position;
+                float dirSign = sign(speed);
+
+                vec3 worldOffset = vec3(0.0);
+                if (axis < 0.5) {
+                    // Moving along X axis
+                    scaledPos.x *= 14.0;
+                    scaledPos.y *= 0.85;
+                    scaledPos.z *= 1.35;
+                    float travelX = mod(aPhase * range + uTime * speed - uCameraPos.x + halfRange, range) - halfRange + uCameraPos.x;
+                    worldOffset = vec3(travelX, altitude, laneCoord);
+                } else {
+                    // Moving along Z axis
+                    scaledPos.z *= 14.0;
+                    scaledPos.y *= 0.85;
+                    scaledPos.x *= 1.35;
+                    float travelZ = mod(aPhase * range + uTime * speed - uCameraPos.z + halfRange, range) - halfRange + uCameraPos.z;
+                    worldOffset = vec3(laneCoord, altitude, travelZ);
+                }
+
+                // Assign bright Cyber Headlights (Cyan/White) vs Taillights (Crimson/Magenta)
+                if (dirSign > 0.0) {
+                    vColor = vec3(0.45, 0.98, 1.0) * 2.2;
+                } else {
+                    vColor = vec3(1.0, 0.08, 0.38) * 2.4;
+                }
+
+                vec4 worldPosition = vec4(scaledPos + worldOffset, 1.0);
+                vFogDepth = length(worldPosition.xyz - uCameraPos);
+                gl_Position = projectionMatrix * viewMatrix * worldPosition;
+            }
+        `;
+
+        const trafficFragmentShader = `
+            uniform float uSmogDensity;
+            varying vec3 vColor;
+            varying float vFogDepth;
+
+            void main() {
+                float fog = clamp(1.0 - exp(-vFogDepth * 0.00065 * uSmogDensity), 0.0, 1.0);
+                vec3 finalCol = mix(vColor, vec3(0.03, 0.02, 0.08), fog);
+                gl_FragColor = vec4(finalCol, 1.0);
+            }
+        `;
+
+        // --- D. ATMOSPHERIC CYBER-SMOG SKY DOME SHADER ---
+        const skyVertexShader = `
+            varying vec3 vWorldDir;
+            void main() {
+                vWorldDir = position;
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+        const skyFragmentShader = `
+            uniform float uTime;
+            uniform float uSmogDensity;
+            uniform int uColorTheme;
+            varying vec3 vWorldDir;
+
+            void main() {
+                vec3 dir = normalize(vWorldDir);
+                float horizon = pow(1.0 - abs(dir.y), 3.5);
+
+                vec3 zenithCol = vec3(0.005, 0.008, 0.025);
+                vec3 horizonColA = vec3(0.0, 0.28, 0.45);
+                vec3 horizonColB = vec3(0.42, 0.02, 0.28);
+
+                if (uColorTheme == 1) {
+                    horizonColA = vec3(0.42, 0.24, 0.02);
+                    horizonColB = vec3(0.38, 0.06, 0.01);
+                } else if (uColorTheme == 2) {
+                    horizonColA = vec3(0.01, 0.35, 0.20);
+                    horizonColB = vec3(0.25, 0.02, 0.40);
+                }
+
+                float azim = sin(atan(dir.z, dir.x) * 2.0 + uTime * 0.05) * 0.5 + 0.5;
+                vec3 smogGlow = mix(horizonColA, horizonColB, azim) * horizon * (0.75 + 0.35 * uSmogDensity);
+
+                // Subtle high-altitude orbital grid lines
+                float grid = smoothstep(0.992, 0.999, abs(sin(dir.x * 40.0) * sin(dir.z * 40.0))) * max(0.0, dir.y);
+                vec3 finalSky = zenithCol + smogGlow + vec3(0.0, 0.5, 0.8) * grid * 0.12;
+
+                gl_FragColor = vec4(finalSky, 1.0);
+            }
+        `;
+
+        /**************************************************************************
+         * 2. PROCEDURAL WEB AUDIO SYNTHWAVE DRONE & THRUSTER ENGINE
+         **************************************************************************/
+        class CyberAudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.isPlaying = false;
+                this.masterGain = null;
+                this.engineFilter = null;
+                this.droneOsc1 = null;
+                this.droneOsc2 = null;
+            }
+
+            toggle() {
+                if (!this.ctx) {
+                    this.initAudio();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+                this.isPlaying = !this.isPlaying;
+                this.masterGain.gain.setTargetAtTime(this.isPlaying ? 0.28 : 0.0, this.ctx.currentTime, 0.25);
+                return this.isPlaying;
+            }
+
+            initAudio() {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioCtx();
+
+                this.masterGain = this.ctx.createGain();
+                this.masterGain.gain.value = 0.0;
+                this.masterGain.connect(this.ctx.destination);
+
+                // 1. Deep Vangelis-style Detuned Sawtooth Pad
+                this.droneOsc1 = this.ctx.createOscillator();
+                this.droneOsc2 = this.ctx.createOscillator();
+                const subOsc = this.ctx.createOscillator();
+
+                this.droneOsc1.type = 'sawtooth';
+                this.droneOsc2.type = 'sawtooth';
+                subOsc.type = 'sine';
+
+                this.droneOsc1.frequency.value = 55.0; // A1
+                this.droneOsc2.frequency.value = 55.45; // Detuned A1
+                subOsc.frequency.value = 27.5; // A0 Sub-bass
+
+                const padFilter = this.ctx.createBiquadFilter();
+                padFilter.type = 'lowpass';
+                padFilter.frequency.value = 260;
+                padFilter.Q.value = 3.5;
+
+                // Slow LFO modulating the pad filter cutoff
+                const lfo = this.ctx.createOscillator();
+                const lfoGain = this.ctx.createGain();
+                lfo.frequency.value = 0.14;
+                lfoGain.gain.value = 140;
+                lfo.connect(lfoGain);
+                lfoGain.connect(padFilter.frequency);
+
+                this.droneOsc1.connect(padFilter);
+                this.droneOsc2.connect(padFilter);
+                subOsc.connect(padFilter);
+                padFilter.connect(this.masterGain);
+
+                // 2. Turbine Thruster Noise Generator
+                const bufferSize = this.ctx.sampleRate * 2;
+                const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+
+                const whiteNoise = this.ctx.createBufferSource();
+                whiteNoise.buffer = noiseBuffer;
+                whiteNoise.loop = true;
+
+                this.engineFilter = this.ctx.createBiquadFilter();
+                this.engineFilter.type = 'bandpass';
+                this.engineFilter.frequency.value = 180;
+                this.engineFilter.Q.value = 2.2;
+
+                const engineGain = this.ctx.createGain();
+                engineGain.gain.value = 0.35;
+
+                whiteNoise.connect(this.engineFilter);
+                this.engineFilter.connect(engineGain);
+                engineGain.connect(this.masterGain);
+
+                this.droneOsc1.start();
+                this.droneOsc2.start();
+                subOsc.start();
+                lfo.start();
+                whiteNoise.start();
+            }
+
+            updateFlightTelemetry(speedRatio, altitude) {
+                if (!this.isPlaying || !this.ctx) return;
+                const targetFreq = 140 + speedRatio * 520 + Math.min(altitude * 0.4, 200);
+                this.engineFilter.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.1);
+            }
+        }
+
+        /**************************************************************************
+         * 3. MAIN APPLICATION & INFINITE WORLD CHUNK MANAGER
+         **************************************************************************/
+        window.onload = function () {
+            const container = document.getElementById('canvas-container');
+            const audioEngine = new CyberAudioEngine();
+
+            // Scene, Camera, WebGLRenderer
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1.5, 4200);
+            camera.position.set(0, 175, 140);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.1;
+            container.appendChild(renderer.domElement);
+
+            // Post-Processing Composer with UnrealBloomPass
+            const renderScene = new THREE.RenderPass(scene, camera);
+            const bloomPass = new THREE.UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                1.45, // strength
+                0.55, // radius
+                0.22  // threshold
+            );
+
+            const composer = new THREE.EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(bloomPass);
+
+            // Shared Global Shader Uniforms
+            const globalUniforms = {
+                uTime: { value: 0 },
+                uCameraPos: { value: camera.position },
+                uSmogDensity: { value: 1.0 },
+                uNeonOverdrive: { value: 1.3 },
+                uRainIntensity: { value: 0.85 },
+                uTrafficSpeed: { value: 1.2 },
+                uColorTheme: { value: 0 }
+            };
+
+            // 1. Create Sky Dome
+            const skyGeo = new THREE.SphereGeometry(3600, 32, 24);
+            const skyMat = new THREE.ShaderMaterial({
+                vertexShader: skyVertexShader,
+                fragmentShader: skyFragmentShader,
+                uniforms: globalUniforms,
+                side: THREE.BackSide,
+                depthWrite: false
+            });
+            const skyDome = new THREE.Mesh(skyGeo, skyMat);
+            scene.add(skyDome);
+
+            // 2. Create Infinite Follow Ground Plane
+            const groundGeo = new THREE.PlaneGeometry(4500, 4500, 1, 1);
+            groundGeo.rotateX(-Math.PI / 2);
+            const groundMat = new THREE.ShaderMaterial({
+                vertexShader: groundVertexShader,
+                fragmentShader: groundFragmentShader,
+                uniforms: globalUniforms
+            });
+            const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+            scene.add(groundMesh);
+
+            // 3. Create Multi-Tiered Aerial Traffic Instanced Stream
+            const TRAFFIC_COUNT = 2600;
+            const trafficBaseGeo = new THREE.BoxGeometry(1, 1, 1);
+            const trafficInstGeo = new THREE.InstancedBufferGeometry();
+            trafficInstGeo.index = trafficBaseGeo.index;
+            trafficInstGeo.attributes.position = trafficBaseGeo.attributes.position;
+
+            const laneDataArray = new Float32Array(TRAFFIC_COUNT * 4);
+            const phaseArray = new Float32Array(TRAFFIC_COUNT);
+            const CHUNK_SIZE = 280.0;
+
+            for (let i = 0; i < TRAFFIC_COUNT; i++) {
+                const axis = i % 2; // 0 = X avenue, 1 = Z avenue
+                // Align traffic streams along chunk avenue boundaries
+                const avenueIndex = Math.floor((Math.random() - 0.5) * 8);
+                const laneOffset = (Math.random() > 0.5 ? 1 : -1) * (5 + Math.random() * 12);
+                const laneCoord = avenueIndex * CHUNK_SIZE + laneOffset;
+
+                // Multi-tiered sky-lanes from street level up to 290m
+                const tier = Math.floor(Math.pow(Math.random(), 1.4) * 7);
+                const altitude = 8 + tier * 42 + Math.random() * 10;
+
+                const dir = laneOffset > 0 ? 1 : -1;
+                const speed = dir * (85 + Math.random() * 140);
+
+                laneDataArray[i * 4 + 0] = axis;
+                laneDataArray[i * 4 + 1] = laneCoord;
+                laneDataArray[i * 4 + 2] = altitude;
+                laneDataArray[i * 4 + 3] = speed;
+                phaseArray[i] = Math.random();
+            }
+
+            trafficInstGeo.setAttribute('aLaneData', new THREE.InstancedBufferAttribute(laneDataArray, 4));
+            trafficInstGeo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phaseArray, 1));
+
+            const trafficMat = new THREE.ShaderMaterial({
+                vertexShader: trafficVertexShader,
+                fragmentShader: trafficFragmentShader,
+                uniforms: globalUniforms
+            });
+
+            const trafficMesh = new THREE.Mesh(trafficInstGeo, trafficMat);
+            trafficMesh.frustumCulled = false;
+            scene.add(trafficMesh);
+
+            // 4. Create Atmospheric Acid Rain Particle Matrix
+            const RAIN_COUNT = 4500;
+            const rainGeo = new THREE.BufferGeometry();
+            const rainPositions = new Float32Array(RAIN_COUNT * 6); // 2 vertices per streak
+            const rainRange = 420;
+            for (let i = 0; i < RAIN_COUNT; i++) {
+                const rx = (Math.random() - 0.5) * rainRange;
+                const ry = (Math.random() - 0.5) * rainRange;
+                const rz = (Math.random() - 0.5) * rainRange;
+                rainPositions[i * 6 + 0] = rx;
+                rainPositions[i * 6 + 1] = ry;
+                rainPositions[i * 6 + 2] = rz;
+                rainPositions[i * 6 + 3] = rx;
+                rainPositions[i * 6 + 4] = ry - 6.5;
+                rainPositions[i * 6 + 5] = rz;
+            }
+            rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+            const rainMat = new THREE.LineBasicMaterial({
+                color: 0x55ddff,
+                transparent: true,
+                opacity: 0.32,
+                blending: THREE.AdditiveBlending
+            });
+            const rainLines = new THREE.LineSegments(rainGeo, rainMat);
+            rainLines.frustumCulled = false;
+            scene.add(rainLines);
+
+            /**********************************************************************
+             * 4. INFINITE PROCEDURAL SKYSCRAPER CHUNK GENERATOR
+             **********************************************************************/
+            const GRID_RADIUS = 3; // 7x7 active grid around player (49 chunks)
+            const SUBBLOCKS_PER_CHUNK = 9; // 3x3 plots per chunk
+            const PARTS_PER_PLOT = 3; // Base, Upper Ziggurat Tier, Spire/Skybridge
+            const TOTAL_CHUNKS = (GRID_RADIUS * 2 + 1) * (GRID_RADIUS * 2 + 1);
+            const MAX_BUILDING_INSTANCES = TOTAL_CHUNKS * SUBBLOCKS_PER_CHUNK * PARTS_PER_PLOT;
+
+            const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
+            const buildingMat = new THREE.ShaderMaterial({
+                vertexShader: buildingVertexShader,
+                fragmentShader: buildingFragmentShader,
+                uniforms: globalUniforms
+            });
+
+            const instancedBuildings = new THREE.InstancedMesh(buildingGeo, buildingMat, MAX_BUILDING_INSTANCES);
+            instancedBuildings.frustumCulled = false;
+            scene.add(instancedBuildings);
+
+            // Per-instance custom shader attributes
+            const aSeedArray = new Float32Array(MAX_BUILDING_INSTANCES);
+            const aArchTypeArray = new Float32Array(MAX_BUILDING_INSTANCES);
+            const aTowerCenterArray = new Float32Array(MAX_BUILDING_INSTANCES * 3);
+            const aTowerScaleArray = new Float32Array(MAX_BUILDING_INSTANCES * 3);
+
+            const seedAttr = new THREE.InstancedBufferAttribute(aSeedArray, 1);
+            const archAttr = new THREE.InstancedBufferAttribute(aArchTypeArray, 1);
+            const centerAttr = new THREE.InstancedBufferAttribute(aTowerCenterArray, 3);
+            const scaleAttr = new THREE.InstancedBufferAttribute(aTowerScaleArray, 3);
+
+            buildingGeo.setAttribute('aSeed', seedAttr);
+            buildingGeo.setAttribute('aArchType', archAttr);
+            buildingGeo.setAttribute('aTowerCenter', centerAttr);
+            buildingGeo.setAttribute('aTowerScale', scaleAttr);
+
+            // Deterministic 2D hash for infinite reproducible city sectors
+            function chunkHash(x, z, salt = 0) {
+                const n = Math.sin(x * 127.1 + z * 311.7 + salt * 74.7) * 43758.5453123;
+                return n - Math.floor(n);
+            }
+
+            const dummy = new THREE.Object3D();
+            let currentCenterChunkX = null;
+            let currentCenterChunkZ = null;
+            let activeTowerCount = 0;
+
+            function updateInfiniteCityChunks(camX, camZ) {
+                const cx = Math.floor((camX + CHUNK_SIZE * 0.5) / CHUNK_SIZE);
+                const cz = Math.floor((camZ + CHUNK_SIZE * 0.5) / CHUNK_SIZE);
+
+                if (cx === currentCenterChunkX && cz === currentCenterChunkZ) return;
+                currentCenterChunkX = cx;
+                currentCenterChunkZ = cz;
+
+                document.getElementById('hud-sector').textContent = `[${String(cx).padStart(2, '0')}, ${String(cz).padStart(2, '0')}]`;
+
+                let instanceIdx = 0;
+                activeTowerCount = 0;
+
+                const avenueMargin = 48.0; // Wide avenue corridors for flying
+                const buildableSpan = CHUNK_SIZE - avenueMargin;
+                const plotSize = buildableSpan / 3.0;
+
+                for (let dx = -GRID_RADIUS; dx <= GRID_RADIUS; dx++) {
+                    for (let dz = -GRID_RADIUS; dz <= GRID_RADIUS; dz++) {
+                        const chunkX = cx + dx;
+                        const chunkZ = cz + dz;
+
+                        const chunkOriginX = chunkX * CHUNK_SIZE - buildableSpan * 0.5;
+                        const chunkOriginZ = chunkZ * CHUNK_SIZE - buildableSpan * 0.5;
+
+                        for (let bx = 0; bx < 3; bx++) {
+                            for (let bz = 0; bz < 3; bz++) {
+                                const plotSeed = chunkHash(chunkX * 3 + bx, chunkZ * 3 + bz, 1);
+                                const archSeed = chunkHash(chunkX * 3 + bx, chunkZ * 3 + bz, 2);
+                                const heightSeed = chunkHash(chunkX * 3 + bx, chunkZ * 3 + bz, 3);
+
+                                const plotCenterX = chunkOriginX + (bx + 0.5) * plotSize;
+                                const plotCenterZ = chunkOriginZ + (bz + 0.5) * plotSize;
+
+                                // Base footprint dimensions
+                                const baseW = plotSize * (0.62 + 0.28 * chunkHash(bx, bz, plotSeed * 10));
+                                const baseD = plotSize * (0.62 + 0.28 * chunkHash(bz, bx, plotSeed * 20));
+
+                                // Power-curve height distribution (mix of mid-rises and colossal megastructures)
+                                const isMegaTower = heightSeed > 0.78;
+                                const baseH = isMegaTower
+                                    ? 220 + Math.pow(heightSeed, 3.0) * 380
+                                    : 55 + Math.pow(heightSeed, 1.6) * 165;
+
+                                activeTowerCount++;
+
+                                // PART 1: Primary Megastructure Core
+                                dummy.position.set(plotCenterX, baseH * 0.5, plotCenterZ);
+                                dummy.scale.set(baseW, baseH, baseD);
+                                dummy.rotation.set(0, 0, 0);
+                                dummy.updateMatrix();
+                                instancedBuildings.setMatrixAt(instanceIdx, dummy.matrix);
+
+                                aSeedArray[instanceIdx] = plotSeed;
+                                aArchTypeArray[instanceIdx] = Math.floor(archSeed * 4.0);
+                                aTowerCenterArray[instanceIdx * 3 + 0] = plotCenterX;
+                                aTowerCenterArray[instanceIdx * 3 + 1] = baseH * 0.5;
+                                aTowerCenterArray[instanceIdx * 3 + 2] = plotCenterZ;
+                                aTowerScaleArray[instanceIdx * 3 + 0] = baseW;
+                                aTowerScaleArray[instanceIdx * 3 + 1] = baseH;
+                                aTowerScaleArray[instanceIdx * 3 + 2] = baseD;
+                                instanceIdx++;
+
+                                // PART 2: Upper Stepped Brutalist Tier or Offset Wing
+                                const tierW = baseW * (0.52 + 0.2 * archSeed);
+                                const tierD = baseD * (0.52 + 0.2 * plotSeed);
+                                const tierH = baseH * (0.38 + 0.25 * heightSeed);
+                                const tierY = baseH + tierH * 0.5;
+
+                                dummy.position.set(plotCenterX, tierY, plotCenterZ);
+                                dummy.scale.set(tierW, tierH, tierD);
+                                dummy.updateMatrix();
+                                instancedBuildings.setMatrixAt(instanceIdx, dummy.matrix);
+
+                                aSeedArray[instanceIdx] = (plotSeed + 0.31) % 1.0;
+                                aArchTypeArray[instanceIdx] = 1.0;
+                                aTowerCenterArray[instanceIdx * 3 + 0] = plotCenterX;
+                                aTowerCenterArray[instanceIdx * 3 + 1] = tierY;
+                                aTowerCenterArray[instanceIdx * 3 + 2] = plotCenterZ;
+                                aTowerScaleArray[instanceIdx * 3 + 0] = tierW;
+                                aTowerScaleArray[instanceIdx * 3 + 1] = tierH;
+                                aTowerScaleArray[instanceIdx * 3 + 2] = tierD;
+                                instanceIdx++;
+
+                                // PART 3: Crown Holographic Spire OR Elevated Cyber-Skybridge
+                                if (archSeed > 0.35) {
+                                    // Needle Antenna / Holographic Crown Spire
+                                    const spireW = Math.max(2.2, tierW * 0.14);
+                                    const spireH = 45 + heightSeed * 95;
+                                    const spireY = baseH + tierH + spireH * 0.5;
+
+                                    dummy.position.set(plotCenterX, spireY, plotCenterZ);
+                                    dummy.scale.set(spireW, spireH, spireW);
+                                    dummy.updateMatrix();
+                                    instancedBuildings.setMatrixAt(instanceIdx, dummy.matrix);
+
+                                    aSeedArray[instanceIdx] = (plotSeed + 0.67) % 1.0;
+                                    aArchTypeArray[instanceIdx] = 2.0;
+                                    aTowerCenterArray[instanceIdx * 3 + 0] = plotCenterX;
+                                    aTowerCenterArray[instanceIdx * 3 + 1] = spireY;
+                                    aTowerCenterArray[instanceIdx * 3 + 2] = plotCenterZ;
+                                    aTowerScaleArray[instanceIdx * 3 + 0] = spireW;
+                                    aTowerScaleArray[instanceIdx * 3 + 1] = spireH;
+                                    aTowerScaleArray[instanceIdx * 3 + 2] = spireW;
+                                    instanceIdx++;
+                                } else {
+                                    // Elevated Skybridge connecting neighboring sectors
+                                    const bridgeAlt = Math.min(baseH * 0.72, 160.0);
+                                    const bridgeLen = plotSize * 1.15;
+                                    dummy.position.set(plotCenterX + plotSize * 0.4, bridgeAlt, plotCenterZ);
+                                    dummy.scale.set(bridgeLen, 7.5, 11.0);
+                                    dummy.updateMatrix();
+                                    instancedBuildings.setMatrixAt(instanceIdx, dummy.matrix);
+
+                                    aSeedArray[instanceIdx] = (plotSeed + 0.52) % 1.0;
+                                    aArchTypeArray[instanceIdx] = 3.0;
+                                    aTowerCenterArray[instanceIdx * 3 + 0] = plotCenterX;
+                                    aTowerCenterArray[instanceIdx * 3 + 1] = bridgeAlt;
+                                    aTowerCenterArray[instanceIdx * 3 + 2] = plotCenterZ;
+                                    aTowerScaleArray[instanceIdx * 3 + 0] = bridgeLen;
+                                    aTowerScaleArray[instanceIdx * 3 + 1] = 7.5;
+                                    aTowerScaleArray[instanceIdx * 3 + 2] = 11.0;
+                                    instanceIdx++;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                instancedBuildings.instanceMatrix.needsUpdate = true;
+                seedAttr.needsUpdate = true;
+                archAttr.needsUpdate = true;
+                centerAttr.needsUpdate = true;
+                scaleAttr.needsUpdate = true;
+                document.getElementById('hud-towers').textContent = activeTowerCount;
+            }
+
+            // Initial world generation around origin
+            updateInfiniteCityChunks(camera.position.x, camera.position.z);
+
+            /**********************************************************************
+             * 5. FIRST-PERSON FLIGHT CONTROLLER & AUTOPILOT TOUR
+             **********************************************************************/
+            const keys = {};
+            let yaw = 0;
+            let pitch = -0.06;
+            let roll = 0;
+            let isPointerLocked = false;
+            let isDragging = false;
+            let prevMouse = { x: 0, y: 0 };
+            let autopilotActive = false;
+            let touchThrustActive = false;
+            let touchBoostActive = false;
+
+            const velocity = new THREE.Vector3();
+            let currentSpeed = 65;
+
+            // Pointer Lock & Mouse Drag Look
+            const btnPointerLock = document.getElementById('btn-pointerlock');
+            const badgeMode = document.getElementById('flight-mode-badge');
+
+            btnPointerLock.addEventListener('click', () => {
+                if (autopilotActive) toggleAutopilot(false);
+                renderer.domElement.requestPointerLock();
+            });
+
+            document.addEventListener('pointerlockchange', () => {
+                isPointerLocked = (document.pointerLockElement === renderer.domElement);
+                if (isPointerLocked) {
+                    badgeMode.textContent = 'POINTER LOCK ACTIVE [ESC TO EXIT]';
+                    btnPointerLock.classList.add('active');
+                } else {
+                    badgeMode.textContent = 'MANUAL / DRAG LOOK';
+                    btnPointerLock.classList.remove('active');
+                }
+            });
+
+            renderer.domElement.addEventListener('mousedown', (e) => {
+                if (!isPointerLocked && e.button === 0) {
+                    isDragging = true;
+                    prevMouse.x = e.clientX;
+                    prevMouse.y = e.clientY;
+                }
+            });
+
+            window.addEventListener('mouseup', () => { isDragging = false; });
+
+            window.addEventListener('mousemove', (e) => {
+                if (autopilotActive) return;
+                const sensitivity = 0.0022;
+                if (isPointerLocked) {
+                    yaw -= e.movementX * sensitivity;
+                    pitch = Math.max(-Math.PI * 0.46, Math.min(Math.PI * 0.46, pitch - e.movementY * sensitivity));
+                    roll = THREE.MathUtils.lerp(roll, -e.movementX * 0.0035, 0.15);
+                } else if (isDragging) {
+                    const dx = e.clientX - prevMouse.x;
+                    const dy = e.clientY - prevMouse.y;
+                    prevMouse.x = e.clientX;
+                    prevMouse.y = e.clientY;
+                    yaw -= dx * sensitivity * 1.3;
+                    pitch = Math.max(-Math.PI * 0.46, Math.min(Math.PI * 0.46, pitch - dy * sensitivity * 1.3));
+                    roll = THREE.MathUtils.lerp(roll, -dx * 0.004, 0.2);
+                }
+            });
+
+            // Keyboard Bindings
+            window.addEventListener('keydown', (e) => {
+                keys[e.code] = true;
+                if (e.code === 'KeyP') toggleAutopilot(!autopilotActive);
+                if (e.code === 'KeyH') toggleShaderDeck();
+            });
+
+            window.addEventListener('keyup', (e) => {
+                keys[e.code] = false;
+            });
+
+            // Mobile Touch Flight Support
+            const btnTouchThrust = document.getElementById('touch-thrust');
+            const btnTouchBoost = document.getElementById('touch-boost');
+            if (btnTouchThrust) {
+                btnTouchThrust.addEventListener('touchstart', (e) => { e.preventDefault(); touchThrustActive = true; });
+                btnTouchThrust.addEventListener('touchend', () => { touchThrustActive = false; });
+            }
+            if (btnTouchBoost) {
+                btnTouchBoost.addEventListener('touchstart', (e) => { e.preventDefault(); touchBoostActive = true; });
+                btnTouchBoost.addEventListener('touchend', () => { touchBoostActive = false; });
+            }
+
+            // UI Controls & Uniform Sliders
+            const btnAutopilot = document.getElementById('btn-autopilot');
+            function toggleAutopilot(state) {
+                autopilotActive = state;
+                btnAutopilot.textContent = `AUTOPILOT: ${autopilotActive ? 'ON' : 'OFF'}`;
+                btnAutopilot.classList.toggle('active', autopilotActive);
+                if (autopilotActive && isPointerLocked) {
+                    document.exitPointerLock();
+                }
+            }
+            btnAutopilot.addEventListener('click', () => toggleAutopilot(!autopilotActive));
+
+            const btnAudio = document.getElementById('btn-audio');
+            btnAudio.addEventListener('click', () => {
+                const active = audioEngine.toggle();
+                btnAudio.textContent = `SYNTH AUDIO: ${active ? 'ON' : 'OFF'}`;
+                btnAudio.classList.toggle('active', active);
+            });
+
+            const shaderDeck = document.getElementById('shader-deck');
+            function toggleShaderDeck() {
+                shaderDeck.classList.toggle('hidden');
+            }
+            document.getElementById('btn-toggle-ui').addEventListener('click', toggleShaderDeck);
+
+            // Sliders Binding
+            const bindSlider = (id, valId, suffix, callback) => {
+                const slider = document.getElementById(id);
+                const valSpan = document.getElementById(valId);
+                slider.addEventListener('input', (e) => {
+                    const v = parseFloat(e.target.value);
+                    valSpan.textContent = v.toFixed(2) + suffix;
+                    callback(v);
+                });
+            };
+
+            bindSlider('slider-bloom', 'val-bloom', '', (v) => { bloomPass.strength = v; });
+            bindSlider('slider-smog', 'val-smog', '', (v) => { globalUniforms.uSmogDensity.value = v; });
+            bindSlider('slider-traffic', 'val-traffic', 'x', (v) => { globalUniforms.uTrafficSpeed.value = v; });
+            bindSlider('slider-rain', 'val-rain', '', (v) => {
+                globalUniforms.uRainIntensity.value = v;
+                rainMat.opacity = Math.min(0.65, v * 0.35);
+            });
+            bindSlider('slider-neon', 'val-neon', '', (v) => { globalUniforms.uNeonOverdrive.value = v; });
+
+            // Theme Buttons
+            document.querySelectorAll('.theme-btn').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    globalUniforms.uColorTheme.value = parseInt(btn.getAttribute('data-theme'), 10);
+                });
+            });
+
+            // Altitude Presets
+            document.getElementById('preset-canyon').addEventListener('click', () => {
+                camera.position.y = 32;
+                pitch = 0.02;
+            });
+            document.getElementById('preset-mid').addEventListener('click', () => {
+                camera.position.y = 165;
+                pitch = -0.05;
+            });
+            document.getElementById('preset-high').addEventListener('click', () => {
+                camera.position.y = 460;
+                pitch = -0.22;
+            });
+
+            /**********************************************************************
+             * 6. REAL-TIME ANIMATION & PHYSICS LOOP
+             **********************************************************************/
+            const clock = new THREE.Clock();
+            let frameCount = 0;
+            let fpsTimer = 0;
+
+            const hudSpeed = document.getElementById('hud-speed');
+            const hudAlt = document.getElementById('hud-alt');
+            const hudHeading = document.getElementById('hud-heading');
+            const hudFps = document.getElementById('hud-fps');
+            const hudThrustPct = document.getElementById('hud-thrust-pct');
+            const hudThrustBar = document.getElementById('hud-thrust-bar');
+            const hudPitchLadder = document.getElementById('hud-pitch-ladder');
+
+            const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+            const forwardDir = new THREE.Vector3();
+            const rightDir = new THREE.Vector3();
+
+            function animate() {
+                requestAnimationFrame(animate);
+
+                const dt = Math.min(clock.getDelta(), 0.1);
+                const elapsed = clock.getElapsedTime();
+                globalUniforms.uTime.value = elapsed;
+
+                // FPS Counter Update
+                frameCount++;
+                fpsTimer += dt;
+                if (fpsTimer >= 0.5) {
+                    hudFps.textContent = `${Math.round(frameCount / fpsTimer)} FPS`;
+                    frameCount = 0;
+                    fpsTimer = 0;
+                }
+
+                // Flight Physics & Autopilot Logic
+                const isBoosting = keys['ShiftLeft'] || keys['ShiftRight'] || touchBoostActive;
+                const maxSpeed = isBoosting ? 360.0 : 135.0;
+
+                if (autopilotActive) {
+                    // Smooth figure-8 banking weaves along the avenue canyons
+                    const tourTime = elapsed * 0.18;
+                    const targetYaw = Math.sin(tourTime) * 1.15 + elapsed * 0.06;
+                    const yawDelta = targetYaw - yaw;
+                    yaw += yawDelta * dt * 2.0;
+                    pitch = THREE.MathUtils.lerp(pitch, Math.sin(elapsed * 0.35) * 0.12 - 0.03, dt * 2.5);
+                    roll = THREE.MathUtils.lerp(roll, -Math.cos(tourTime) * 0.28, dt * 3.0);
+
+                    euler.set(pitch, yaw, roll, 'YXZ');
+                    camera.quaternion.setFromEuler(euler);
+
+                    forwardDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
+                    camera.position.addScaledVector(forwardDir, 155.0 * dt);
+                    camera.position.y = THREE.MathUtils.lerp(camera.position.y, 135 + Math.sin(elapsed * 0.4) * 75, dt * 1.5);
+                    currentSpeed = 155.0;
+                } else {
+                    // Keyboard Roll & Arrow Look Support
+                    if (keys['ArrowLeft']) yaw += 1.4 * dt;
+                    if (keys['ArrowRight']) yaw -= 1.4 * dt;
+                    if (keys['ArrowUp']) pitch = Math.min(Math.PI * 0.45, pitch + 1.1 * dt);
+                    if (keys['ArrowDown']) pitch = Math.max(-Math.PI * 0.45, pitch - 1.1 * dt);
+
+                    if (keys['KeyQ']) roll = THREE.MathUtils.lerp(roll, 0.45, dt * 4.0);
+                    else if (keys['KeyE']) roll = THREE.MathUtils.lerp(roll, -0.45, dt * 4.0);
+                    else roll = THREE.MathUtils.lerp(roll, 0.0, dt * 4.5);
+
+                    euler.set(pitch, yaw, roll, 'YXZ');
+                    camera.quaternion.setFromEuler(euler);
+
+                    forwardDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
+                    rightDir.set(1, 0, 0).applyQuaternion(camera.quaternion);
+
+                    const accel = isBoosting ? 580.0 : 260.0;
+                    let hasInput = false;
+
+                    if (keys['KeyW'] || touchThrustActive || touchBoostActive) {
+                        velocity.addScaledVector(forwardDir, accel * dt);
+                        hasInput = true;
+                    }
+                    if (keys['KeyS']) {
+                        velocity.addScaledVector(forwardDir, -accel * dt);
+                        hasInput = true;
+                    }
+                    if (keys['KeyA']) {
+                        velocity.addScaledVector(rightDir, -accel * 0.8 * dt);
+                        roll = THREE.MathUtils.lerp(roll, 0.22, dt * 4.0);
+                        hasInput = true;
+                    }
+                    if (keys['KeyD']) {
+                        velocity.addScaledVector(rightDir, accel * 0.8 * dt);
+                        roll = THREE.MathUtils.lerp(roll, -0.22, dt * 4.0);
+                        hasInput = true;
+                    }
+                    if (keys['Space']) {
+                        velocity.y += accel * 0.75 * dt;
+                        hasInput = true;
+                    }
+                    if (keys['KeyC'] || keys['ControlLeft']) {
+                        velocity.y -= accel * 0.75 * dt;
+                        hasInput = true;
+                    }
+
+                    // Gentle ambient forward cruise if idle so the city feels alive immediately
+                    if (!hasInput && velocity.lengthSq() < 400.0) {
+                        velocity.addScaledVector(forwardDir, 65.0 * dt);
+                    }
+
+                    // Air drag & velocity clamping
+                    velocity.multiplyScalar(Math.exp(-2.2 * dt));
+                    if (velocity.length() > maxSpeed) {
+                        velocity.setLength(maxSpeed);
+                    }
+
+                    camera.position.addScaledVector(velocity, dt);
+
+                    // Prevent dipping below wet asphalt street level
+                    if (camera.position.y < 8.0) {
+                        camera.position.y = 8.0;
+                        velocity.y = Math.max(0, velocity.y);
+                    }
+
+                    currentSpeed = velocity.length();
+                }
+
+                // Dynamic FOV Warp on Afterburner Boost
+                const targetFov = isBoosting ? 88.0 : 70.0;
+                if (Math.abs(camera.fov - targetFov) > 0.1) {
+                    camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, dt * 6.0);
+                    camera.updateProjectionMatrix();
+                }
+
+                // Keep Sky Dome & Wet Street Plane centered under player
+                skyDome.position.copy(camera.position);
+                groundMesh.position.x = camera.position.x;
+                groundMesh.position.z = camera.position.z;
+
+                // Update Acid Rain Particle Box around Camera
+                const rPos = rainGeo.attributes.position.array;
+                const fallStep = (160.0 + currentSpeed * 0.4) * dt * globalUniforms.uRainIntensity.value;
+                const halfRain = rainRange * 0.5;
+                for (let i = 0; i < RAIN_COUNT; i++) {
+                    let y1 = rPos[i * 6 + 1] - fallStep;
+                    let x1 = rPos[i * 6 + 0];
+                    let z1 = rPos[i * 6 + 2];
+
+                    // Wrap rain particles within local box around camera
+                    if (y1 < camera.position.y - halfRain) y1 += rainRange;
+                    if (y1 > camera.position.y + halfRain) y1 -= rainRange;
+                    if (x1 < camera.position.x - halfRain) x1 += rainRange;
+                    if (x1 > camera.position.x + halfRain) x1 -= rainRange;
+                    if (z1 < camera.position.z - halfRain) z1 += rainRange;
+                    if (z1 > camera.position.z + halfRain) z1 -= rainRange;
+
+                    rPos[i * 6 + 0] = x1;
+                    rPos[i * 6 + 1] = y1;
+                    rPos[i * 6 + 2] = z1;
+                    rPos[i * 6 + 3] = x1;
+                    rPos[i * 6 + 4] = y1 - 7.5;
+                    rPos[i * 6 + 5] = z1;
+                }
+                rainGeo.attributes.position.needsUpdate = true;
+
+                // Seamlessly recycle & generate infinite skyscraper sectors
+                updateInfiniteCityChunks(camera.position.x, camera.position.z);
+
+                // Update HUD Telemetry & Artificial Horizon
+                const knots = Math.round(currentSpeed * 1.4);
+                hudSpeed.textContent = String(knots).padStart(3, '0');
+                hudAlt.textContent = String(Math.round(camera.position.y)).padStart(3, '0');
+
+                const deg = ((Math.round((-yaw * 180 / Math.PI) % 360) + 360) % 360);
+                const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+                const cardinal = dirs[Math.round(deg / 45) % 8];
+                hudHeading.textContent = `${String(deg).padStart(3, '0')}° ${cardinal}`;
+
+                const thrustRatio = Math.min(100, Math.round((currentSpeed / 360.0) * 100));
+                hudThrustPct.textContent = `${thrustRatio}%`;
+                hudThrustBar.style.width = `${Math.max(12, thrustRatio)}%`;
+
+                // Pitch & Roll Reticle SVG transform
+                const pitchOffset = THREE.MathUtils.clamp(pitch * 55, -35, 35);
+                const rollDeg = THREE.MathUtils.clamp(-roll * 180 / Math.PI, -45, 45);
+                hudPitchLadder.setAttribute('transform', `translate(0, ${pitchOffset}) rotate(${rollDeg}, 120, 120)`);
+
+                // Update Web Audio Synthesizer
+                audioEngine.updateFlightTelemetry(currentSpeed / 360.0, camera.position.y);
+
+                // Render with UnrealBloomPass
+                composer.render();
+            }
+
+            // Responsive Resize Handler
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                composer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            // Start main loop
+            animate();
+        };
+    </script>
+</body>
+</html>
